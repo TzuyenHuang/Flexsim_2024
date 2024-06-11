@@ -1,0 +1,367 @@
+//clear-----------------------------------------------------------------------
+setviewtext(systemwindow(1), "");
+setviewtext(systemwindow(2), "");
+setviewtext(systemwindow(3), "");
+for(int n = content(model()); n > 1; n--){
+	destroyobject(rank(model(), n));
+}
+
+treenode GlobalLists1 = Model.find("Tools/GlobalLists");
+for(int i = 1; i <= GlobalLists1.subnodes.length; i++)
+{
+   string ListType = GlobalLists1.subnodes[i].find(">variables/listType").value;
+   if(ListType == "TaskSequence")
+    {
+      GlobalLists1.subnodes[i].destroy();
+    }
+}
+
+treenode GlobalLists2 = Model.find("Tools/GlobalLists");
+for(int i = 1; i <= GlobalLists2.subnodes.length; i++)
+{
+   string ListType = GlobalLists2.subnodes[i].find(">variables/listType").value;
+   if(ListType == "General")
+    {
+      GlobalLists2.subnodes[i].destroy();
+    }
+}
+
+//Excel------------------------------------------------------------------------------------------
+//treenode GlobalTable1 = Tools.create("GlobalTable");
+Table requirement = Table("GlobalTable1");
+Table num_item = Table("GlobalTable2");
+Table rack_dim = Table("GlobalTable3");
+/*excelopen("C:/Users/Tzuyen/Desktop/Data.xlsx");
+excelsetsheet("Sheet1");
+excelimporttable("GlobalTable1", 0, 0, 0, 0);
+excelclose(true);*/
+
+//Physical Layer---------------------------------------------------------------------------------
+Object source1 = Object.create("Source");
+Object Source1 = Model.find("Source");
+source1.location = Vec3(0, 0, 0);
+
+Object queue = Object.create("Queue");
+Object Queue = Model.find("Queue");
+queue.location = Vec3(5, 0, 0);
+
+Storage.Object rack = Object.create("Rack");
+Object Rack = Model.find("Rack");
+rack.location = Vec3(10, 0, 0);
+//Rack維度
+Map dimensions = Rack.getProperty("Dimensions");
+dimensions.NumBays = rack_dim[1][1];
+dimensions.NumLevels = rack_dim[1][2];
+dimensions.SlotsPerBay = rack_dim[1][3];
+Rack.setProperty("Dimensions",dimensions);
+
+Object sink = Object.create("Sink");
+Object Sink = Model.find("Sink");
+sink.location = Vec3(5, 2, 0);
+
+Object source2 = Object.create("Source");
+Object Source2 = Model.find("Source");
+source2.location = Vec3(10, 2, 0);
+
+TaskExecuter asrsvehicle = Object.create("ASRSvehicle");
+Object ASRSvehicle = Model.find("ASRSvehicle");
+asrsvehicle.location = Vec3(5, -5, 0);
+
+
+contextdragconnection(source1, queue, "A");
+contextdragconnection(queue, rack, "A");
+contextdragconnection(rack, sink, "A");
+contextdragconnection(source2, rack, "A");
+
+contextdragconnection(asrsvehicle, queue, "S");
+contextdragconnection(rack, asrsvehicle, "S");
+
+//Requirement Layer------------------------------------------------------------------------------
+//依照Excel生成asrs行為序列(0:從Rack到Sink 1:從Queue到Rack)
+int array_length = requirement.numRows;
+asrsvehicle.label1 = Array(array_length).fill(0);
+for(int i = 1; i <= array_length; i++) asrsvehicle.label1[i] = requirement[i][1];
+print(asrsvehicle.label1);
+
+int num_input = num_item[1][1];
+int num_output = num_item[1][2];
+
+//生成到Queue上的物品(可以被放置到Rack)
+source1.setProperty("ArrivalStyle", 2);
+Table sourceArrivals1 = source1.find(">variables/schedule");
+sourceArrivals1.addCol(4, 0);
+sourceArrivals1.setColHeader(4, "Type");
+sourceArrivals1[1][4] = duniform(1, 2);
+for(int i = 2; i <= num_input; i++){
+	sourceArrivals1.addRow();
+	sourceArrivals1.setRowHeader(i, "Arrival" + i);
+	sourceArrivals1[i][1] = 0;
+	sourceArrivals1[i][2] = "Product";
+	sourceArrivals1[i][3] = 1;
+	sourceArrivals1[i][4] = duniform(1, 2);
+}
+
+source1.setProperty("Triggers.OnCreation", "Object current = ownerobject(c);\n\
+Object item = param(1);\n\
+int rownumber = param(2); //row number of the schedule/sequence table\n\
+{ // ************* PickOption Start ************* //\n\
+/***popup:SetLabel*/\n\
+/**Set Label*/\n\
+Object involved = /** \nObject: *//***tag:object*//**/item/**/;\n\
+string labelname = /** \nLabel: *//***tag:label*//**/\"Order\"/**/;\n\
+Variant value = /** \nValue: *//***tag:value*//**/current.labels.assert(\"Counter\",1).value++/**/;\n\
+\n\
+involved.labels.assert(labelname).value = value;\n\
+} // ******* PickOption End ******* //\n\
+");
+
+//生成到Rack上的物品(可以被取出到sink)
+source2.setProperty("ArrivalStyle", 2);
+Table sourceArrivals2 = source2.find(">variables/schedule");
+sourceArrivals2.addCol(4, 0);
+sourceArrivals2.setColHeader(4, "Type");
+sourceArrivals2[1][4] = duniform(1, 2);
+for(int i = 2; i <= num_output; i++){
+	sourceArrivals2.addRow();
+	sourceArrivals2.setRowHeader(i, "Arrival" + i);
+	sourceArrivals2[i][1] = 0;
+	sourceArrivals2[i][2] = "Product";
+	sourceArrivals2[i][3] = 1;
+	sourceArrivals2[i][4] = duniform(1, 2);
+}
+
+//一開始就放在Rack上的物品是隨機擺放的
+source2.setProperty("Triggers.OnCreation", "Object current = ownerobject(c);\n\
+Object item = param(1);\n\
+{ // ************* PickOption Start ************* //\n\
+/***popup:SetLabel*/\n\
+/**Set Label*/\n\
+Object involved = /** \nObject: *//***tag:object*//**/item/**/;\n\
+string labelname = /** \nLabel: *//***tag:label*//**/\"Order\"/**/;\n\
+Variant value = /** \nValue: *//***tag:value*//**/current.labels.assert(\"Counter\",1).value++/**/;\n\
+\n\
+involved.labels.assert(labelname).value = value;\n\
+} // ******* PickOption End ******* //\n\
+\n\
+Map dimensions = current.outObjects[1].getProperty(\"Dimensions\");\n\
+int Bay = dimensions.NumBays;\n\
+int Level = dimensions.NumLevels;\n\
+int Slot = dimensions.SlotsPerBay;\n\
+\n\
+int i = duniform(1, Bay, 1);\n\
+int j = duniform(1, Level, 1);\n\
+int k = duniform(1, Slot, 1);\n\
+\n\
+Storage.Item(item).as(Storage.Item).assignedSlot = current.outObjects[1].as(Storage.Object).getSlot(i, j, k);\n\
+");
+
+//Operation Layer--------------------------------------------------------------------------------
+//讓ASRS依照Label1順序執行0、1動作(0:從Rack取出到Sink； 1:從Queue放到Rack)
+//Add Global Lists
+treenode list1 = Tools.create("List", "TaskSequence");// Tools API
+treenode focus = list1;
+string fieldTypeName = "ExpressionField";
+treenode newField = function_s(focus, "addField", fieldTypeName);
+newField.name = "bound";
+treenode Expression = newField.find("expression");
+string Code = "/**Custom Code*/\n\
+Variant value = param(1);\n\
+Variant puller = param(2);\n\
+treenode entry = param(3);\n\
+double pushTime = param(4);\n\
+if(value.as(TaskSequence).tasks[2].involved2 == Model.find(\"Rack\")) return 0; //若task[2]和Rack有關，則return 0\n\
+return 1; //若task[2]和Rack無關，則return 1\n\
+";
+Expression.value = Code;
+
+list1.find(">variables/fields/age").destroy(); // Removing first two fields
+list1.find(">variables/fields/distance").destroy();
+
+asrsvehicle.setProperty("Triggers.OnMessage", "/**Custom Code*/\n\
+Object current = ownerobject(c);\n\
+Object fromObject = param(1);\n\
+Variant msgparam1 = param(2);\n\
+Variant msgparam2 = param(3);\n\
+Variant msgparam3 = param(4);\n\
+\n\
+int done = 0;\n\
+while(!done) {\n\
+    int valuebound = current.label1[1];\n\
+    string qrystr = \"WHERE bound == \"+string.fromNum(valuebound);\n\
+    TaskSequence pulledTs = List(\"TSList1\").pull(qrystr, 1, 1, current, 0, LIST_DO_NOT_BACK_ORDER);\n\
+    if (pulledTs){\n\
+        pulledTs.move(current);\n\
+        pulledTs.dispatch();\n\
+        current.label1.shift();\n\
+        if(current.label1.length == 0) current.label1 = [-1];\n\
+    }\n\
+    else done = 1;\n\
+}\n\
+");
+
+Queue.setProperty("UseTransport", 1);
+
+//定義Queue中的物品如何被處理&傳輸
+Queue.setProperty("TransportRef", "Object current = ownerobject(c);\n\
+Object item = param(1);\n\
+int port = param(2);\n\
+Object destination = param(3);\n\
+double priority = param(4);\n\
+int preempt = param(5);\n\
+\n\
+\n\
+if (true) {\n\
+	TaskSequence taskSequence = TaskSequence.create(assertattribute(current, \"stored\", 0), priority, preempt);\n\
+	\n\
+	taskSequence.addTask(TASKTYPE_TRAVEL, current, NULL); //ASRS移動到目前位置\n\
+	taskSequence.addTask(TASKTYPE_LOAD, item, current, port); //ASRS從指定位置(current)裝載item到port\n\
+	taskSequence.addTask(TASKTYPE_BREAK, NULL, NULL); //ASRS暫停\n\
+	taskSequence.addTask(TASKTYPE_TRAVEL, destination, NULL); //ASRS移動到指定位置\n\
+	taskSequence.addTask(TASKTYPE_UNLOAD, item, destination, opipno(current,port)); //ASRS從指定位置(destination)將item從卸載端口opipno(current,port)卸下\n\
+	string listName = \"TSList1\";\n\
+	List(listName).push(taskSequence, 0); //將taskSequence push到TSList1\n\
+	current.centerObjects[1].message(0.01, current); //從current發出延遲0.01的訊息到curret.centerObject[1](ASRS)\n\
+}\n\
+return 0;\n\
+");
+
+Rack.setProperty("UseTransport", 1);
+
+//定義Rack中的物品如何被處理&傳輸
+Rack.setProperty("TransportRef", "Object current = ownerobject(c);\n\
+Object item = param(1);\n\
+int port = param(2);\n\
+Object destination = param(3);\n\
+double priority = param(4);\n\
+int preempt = param(5);\n\
+\n\
+if (true) {\n\
+	TaskSequence taskSequence = TaskSequence.create(assertattribute(current, \"stored\", 0), priority, preempt);\n\
+\n\
+	taskSequence.addTask(TASKTYPE_TRAVEL, current, NULL);\n\
+	taskSequence.addTask(TASKTYPE_LOAD, item, current, port);\n\
+	taskSequence.addTask(TASKTYPE_BREAK, NULL, NULL);\n\
+	taskSequence.addTask(TASKTYPE_TRAVEL, destination, NULL);\n\
+	taskSequence.addTask(TASKTYPE_UNLOAD, item, destination, opipno(current,port));\n\
+	string listName = \"TSList1\";\n\
+	List(listName).push(taskSequence, 0);\n\
+	current.centerObjects[1].message(0, current);\n\
+}\n\
+return 0;\n\
+");
+
+//物品離開queue->隨機放一個slot(空的優先)
+queue.setProperty("Triggers.OnExit", "Object current = ownerobject(c);\n\
+Object item = param(1);\n\
+int port = param(2);\n\
+{ // ************* PickOption Start ************* //\n\
+/***popup:CodeSnippet*/\n\
+/***tag:description*//**Code Snippet*/\n\
+/***tag:snippet*//**/Storage.Item(item).as(Storage.Item).assignedSlot = Storage.system.findSlot(\"WHERE slot.slotItems.length < 1 ORDER BY RAND()\");/**/\n\
+; // leave a no-op statement in case they leave it empty\n\
+} // ******* PickOption End ******* //\n\
+");
+
+//重新整理rack儲存狀態
+rack.setProperty("Triggers.OnSlotEntry", "/**Custom Code*/\n\
+Object current = ownerobject(c);\n\
+Storage.Slot slot = param(1);\n\
+Object item = param(2);\n\
+Variant slotID = param(3);\n\
+Variant levelID = param(4);\n\
+Variant bayID = param(5);\n\
+Variant aisleID = param(6);\n\
+\n\
+slot.Order.push(item.Order);\n\
+");
+
+rack.setProperty("Triggers.OnSlotExit", "/**Custom Code*/\n\
+Object current = ownerobject(c);\n\
+Storage.Slot slot = param(1);\n\
+Object item = param(2);\n\
+Variant slotID = param(3);\n\
+Variant levelID = param(4);\n\
+Variant bayID = param(5);\n\
+Variant aisleID = param(6);\n\
+\n\
+int index = slot.Order.indexOf(item.Order);\n\
+slot.Order.splice(index, 1);\n\
+");
+
+rack.setProperty("Triggers.OnReset", "/**Reset \"Order\" label and push slots to list*/\n\
+Object current = ownerobject(c);\n\
+\n\
+Storage.Object curSO = current;\n\
+for(int i = 1; i <= curSO.bays.length; i++){\n\
+	Storage.Bay bay = curSO.bays[i];\n\
+	for(int j = 1; j <= bay.levels.length; j++){\n\
+		Storage.Level level = bay.levels[j];\n\
+		for(int k = 1; k <= level.slots.length; k++){\n\
+			Storage.Slot slot = level.slots[k];\n\
+			slot.Order = [];\n\
+			List(\"List1\").push(slot.as(treenode));\n\
+		}\n\
+	}\n\
+}\n\
+");
+
+//Rack inventory status--------------------------------------------------------------------------
+treenode list = Tools.create("List", "General");// Tools API
+
+treenode focus1 = list;
+string fieldTypeName1 = "ExpressionField";
+treenode newField1 = function_s(focus1, "addField", fieldTypeName1);
+newField1.name = "Rack";
+treenode Expression1 = newField1.find("expression");
+string Code1 = "Variant value = param(1);\n\
+Variant puller = param(2);\n\
+treenode entry = param(3);\n\
+double pushTime = param(4);\n\
+return /**/value.as(Storage.Slot).storageObject/**direct*/;\n\
+";
+Expression1.value = Code1;
+
+treenode focus2 = list;
+string fieldTypeName2 = "ExpressionField";
+treenode newField2 = function_s(focus2, "addField", fieldTypeName2);
+newField2.name = "Bay";
+treenode Expression2 = newField2.find("expression");
+string Code2 = "Variant value = param(1);\n\
+Variant puller = param(2);\n\
+treenode entry = param(3);\n\
+double pushTime = param(4);\n\
+return /**/value.as(Storage.Slot).bayID/**direct*/;\n\
+";
+Expression2.value = Code2;
+
+treenode focus3 = list;
+string fieldTypeName3 = "ExpressionField";
+treenode newField3 = function_s(focus3, "addField", fieldTypeName3);
+newField3.name = "Level";
+treenode Expression3 = newField3.find("expression");
+string Code3 = "Variant value = param(1);\n\
+Variant puller = param(2);\n\
+treenode entry = param(3);\n\
+double pushTime = param(4);\n\
+return /**/value.as(Storage.Slot).levelID/**direct*/;\n\
+";
+Expression3.value = Code3;
+
+treenode focus4 = list;
+string fieldTypeName4 = "ExpressionField";
+treenode newField4 = function_s(focus4, "addField", fieldTypeName4);
+newField4.name = "Slot";
+treenode Expression4 = newField4.find("expression");
+string Code4 = "Variant value = param(1);\n\
+Variant puller = param(2);\n\
+treenode entry = param(3);\n\
+double pushTime = param(4);\n\
+return /**/value.as(Storage.Slot).slotID/**direct*/;\n\
+";
+Expression4.value = Code4;
+
+treenode focus5 = list;
+string fieldTypeName5 = "LabelField";
+treenode newField5 = function_s(focus5, "addField", fieldTypeName5, 1);
+newField5.name = "Order";
+newField5.subnodes["isDynamic"].value = 1;
