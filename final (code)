@@ -27,14 +27,9 @@ for(int i = 1; i <= GlobalLists2.subnodes.length; i++)
 }
 
 //Excel------------------------------------------------------------------------------------------
-//treenode GlobalTable1 = Tools.create("GlobalTable");
 Table requirement = Table("GlobalTable1");
-Table num_item = Table("GlobalTable2");
-Table rack_dim = Table("GlobalTable3");
-/*excelopen("C:/Users/Tzuyen/Desktop/Data.xlsx");
-excelsetsheet("Sheet1");
-excelimporttable("GlobalTable1", 0, 0, 0, 0);
-excelclose(true);*/
+Table rack_dim = Table("GlobalTable2");
+//Table exponential = Table("GlobalTable3");
 
 //Physical Layer---------------------------------------------------------------------------------
 Object source1 = Object.create("Source");
@@ -51,27 +46,21 @@ rack.location = Vec3(10, 0, 0);
 //Rack維度
 Map dimensions = Rack.getProperty("Dimensions");
 dimensions.NumBays = rack_dim[1][1];
-dimensions.NumLevels = rack_dim[1][2];
-dimensions.SlotsPerBay = rack_dim[1][3];
+dimensions.NumLevels = rack_dim[2][1];
+dimensions.SlotsPerBay = rack_dim[3][1];
 Rack.setProperty("Dimensions",dimensions);
 
 Object sink = Object.create("Sink");
 Object Sink = Model.find("Sink");
 sink.location = Vec3(5, 2, 0);
 
-Object source2 = Object.create("Source");
-Object Source2 = Model.find("Source");
-source2.location = Vec3(10, 2, 0);
-
 TaskExecuter asrsvehicle = Object.create("ASRSvehicle");
 Object ASRSvehicle = Model.find("ASRSvehicle");
 asrsvehicle.location = Vec3(5, -5, 0);
 
-
 contextdragconnection(source1, queue, "A");
 contextdragconnection(queue, rack, "A");
 contextdragconnection(rack, sink, "A");
-contextdragconnection(source2, rack, "A");
 
 contextdragconnection(asrsvehicle, queue, "S");
 contextdragconnection(rack, asrsvehicle, "S");
@@ -83,24 +72,7 @@ asrsvehicle.label1 = Array(array_length).fill(0);
 for(int i = 1; i <= array_length; i++) asrsvehicle.label1[i] = requirement[i][1];
 print(asrsvehicle.label1);
 
-int num_input = num_item[1][1];
-int num_output = num_item[1][2];
-
-//生成到Queue上的物品(可以被放置到Rack)
-source1.setProperty("ArrivalStyle", 2);
-Table sourceArrivals1 = source1.find(">variables/schedule");
-sourceArrivals1.addCol(4, 0);
-sourceArrivals1.setColHeader(4, "Type");
-sourceArrivals1[1][4] = duniform(1, 2);
-for(int i = 2; i <= num_input; i++){
-	sourceArrivals1.addRow();
-	sourceArrivals1.setRowHeader(i, "Arrival" + i);
-	sourceArrivals1[i][1] = 0;
-	sourceArrivals1[i][2] = "Product";
-	sourceArrivals1[i][3] = 1;
-	sourceArrivals1[i][4] = duniform(1, 2);
-}
-
+//item labels
 source1.setProperty("Triggers.OnCreation", "Object current = ownerobject(c);\n\
 Object item = param(1);\n\
 int rownumber = param(2); //row number of the schedule/sequence table\n\
@@ -113,46 +85,6 @@ Variant value = /** \nValue: *//***tag:value*//**/current.labels.assert(\"Counte
 \n\
 involved.labels.assert(labelname).value = value;\n\
 } // ******* PickOption End ******* //\n\
-");
-
-//生成到Rack上的物品(可以被取出到sink)
-source2.setProperty("ArrivalStyle", 2);
-Table sourceArrivals2 = source2.find(">variables/schedule");
-sourceArrivals2.addCol(4, 0);
-sourceArrivals2.setColHeader(4, "Type");
-sourceArrivals2[1][4] = duniform(1, 2);
-for(int i = 2; i <= num_output; i++){
-	sourceArrivals2.addRow();
-	sourceArrivals2.setRowHeader(i, "Arrival" + i);
-	sourceArrivals2[i][1] = 0;
-	sourceArrivals2[i][2] = "Product";
-	sourceArrivals2[i][3] = 1;
-	sourceArrivals2[i][4] = duniform(1, 2);
-}
-
-//一開始就放在Rack上的物品是隨機擺放的
-source2.setProperty("Triggers.OnCreation", "Object current = ownerobject(c);\n\
-Object item = param(1);\n\
-{ // ************* PickOption Start ************* //\n\
-/***popup:SetLabel*/\n\
-/**Set Label*/\n\
-Object involved = /** \nObject: *//***tag:object*//**/item/**/;\n\
-string labelname = /** \nLabel: *//***tag:label*//**/\"Order\"/**/;\n\
-Variant value = /** \nValue: *//***tag:value*//**/current.labels.assert(\"Counter\",1).value++/**/;\n\
-\n\
-involved.labels.assert(labelname).value = value;\n\
-} // ******* PickOption End ******* //\n\
-\n\
-Map dimensions = current.outObjects[1].getProperty(\"Dimensions\");\n\
-int Bay = dimensions.NumBays;\n\
-int Level = dimensions.NumLevels;\n\
-int Slot = dimensions.SlotsPerBay;\n\
-\n\
-int i = duniform(1, Bay, 1);\n\
-int j = duniform(1, Level, 1);\n\
-int k = duniform(1, Slot, 1);\n\
-\n\
-Storage.Item(item).as(Storage.Item).assignedSlot = current.outObjects[1].as(Storage.Object).getSlot(i, j, k);\n\
 ");
 
 //Operation Layer--------------------------------------------------------------------------------
