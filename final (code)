@@ -72,6 +72,15 @@ asrsvehicle.label1 = Array(array_length).fill(0);
 for(int i = 1; i <= array_length; i++) asrsvehicle.label1[i] = requirement[i][1];
 print(asrsvehicle.label1);
 
+//exponential
+treenode interarrivaltime = source1.find(">variables/interarrivaltime");
+string codeString1 = interarrivaltime.value;
+interarrivaltime.value = codeString1.replace("0", "Table(\"GlobalTable3\")[1][1]");
+string codeString2 = interarrivaltime.value;
+interarrivaltime.value = codeString2.replace("10", "Table(\"GlobalTable3\")[2][1]");
+string codeString3 = interarrivaltime.value;
+interarrivaltime.value = codeString3.replace("getstream(current)", "Table(\"GlobalTable3\")[3][1]");
+
 //item labels
 source1.setProperty("Triggers.OnCreation", "Object current = ownerobject(c);\n\
 Object item = param(1);\n\
